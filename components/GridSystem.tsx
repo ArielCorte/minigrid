@@ -9,6 +9,7 @@ type Coords = {
 };
 
 type NodeData = {
+  id: string;
   coords: Coords;
   color: string;
   size: number;
@@ -36,6 +37,7 @@ export default function GridSystem() {
     setNodes((prevNodes) => [
       ...prevNodes,
       {
+        id: nodes.length.toString(),
         coords: cursorCoords,
         color: "bg-orange-500",
         size: 30,
@@ -47,14 +49,20 @@ export default function GridSystem() {
     setNodes([]);
   }
 
+  function updateNode(nodeData: NodeData) {
+    setNodes((prevNodes) => {
+      const nodeIndex = prevNodes.findIndex((node) => node.id === nodeData.id);
+      const newNodes = [...prevNodes];
+      newNodes[nodeIndex] = nodeData;
+      return newNodes;
+    });
+  }
+
   return (
     <div className="w-screen h-screen bg-purple-100" onMouseDown={placeNode}>
       <Hud {...{ resetGrid }} />
       {nodes.map((node) => (
-        <GridNode
-          nodeData={node}
-          key={node.coords.x.toString() + "," + node.coords.y.toString()}
-        />
+        <GridNode nodeData={node} updateNodeData={updateNode} key={node.id} />
       ))}
     </div>
   );
@@ -76,16 +84,30 @@ function Hud({ resetGrid }: { resetGrid: () => void }) {
   );
 }
 
-function GridNode({ nodeData }: { nodeData: NodeData }) {
+function GridNode({
+  nodeData,
+  updateNodeData,
+}: {
+  nodeData: NodeData;
+  updateNodeData: (nodeData: NodeData) => void;
+}) {
   const [isDragging, setIsDragging] = useState(false);
 
   const targetDiv = useRef<HTMLDivElement>(null);
 
-  function stopDrag() {
+  function stopDrag(e: MouseEvent) {
     console.log("stopDrag");
     setIsDragging(false);
     window.removeEventListener("mousemove", followCursor);
     window.removeEventListener("mouseup", stopDrag);
+    console.log(e.clientX, e.clientY);
+    updateNodeData({
+      ...nodeData,
+      coords: {
+        x: e.clientX,
+        y: e.clientY,
+      },
+    });
   }
 
   function startDrag(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
@@ -96,7 +118,7 @@ function GridNode({ nodeData }: { nodeData: NodeData }) {
   }
 
   function followCursor(e: MouseEvent) {
-    console.log("followCursor");
+    console.log(e.clientX, e.clientY);
     if (!targetDiv.current) return;
     targetDiv.current.style.left = `${e.clientX - nodeData.size / 2}px`;
     targetDiv.current.style.top = `${e.clientY - nodeData.size / 2}px`;
