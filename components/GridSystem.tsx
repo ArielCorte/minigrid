@@ -13,10 +13,20 @@ type NodeData = {
   coords: Coords;
   color: string;
   size: number;
+  closestNeighborID?: string;
+  content: string;
 };
 
 export default function GridSystem() {
   const [nodes, setNodes] = useState<NodeData[]>([]);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    canvasRef.current.height = window.innerHeight;
+    canvasRef.current.width = window.innerWidth;
+  }, []);
 
   function getCursorCoords(
     e: React.MouseEvent<HTMLDivElement, MouseEvent>
@@ -41,12 +51,38 @@ export default function GridSystem() {
         coords: cursorCoords,
         color: "bg-orange-500",
         size: 30,
+        content: nodes.length.toString(),
       },
     ]);
+
+    updateClosestNeighbors();
+
+    console.log(nodes);
   }
 
   function resetGrid() {
     setNodes([]);
+  }
+
+  function getClosesNeighborID(
+    id: string,
+    nodes: NodeData[]
+  ): string | undefined {
+    const node = nodes.find((node) => node.id === id);
+    if (!node) return;
+    const closestNode = nodes.reduce((prevNode, currNode) => {
+      if (currNode.id === id) return prevNode;
+      const prevNodeDistance = Math.sqrt(
+        Math.pow(prevNode.coords.x - node.coords.x, 2) +
+          Math.pow(prevNode.coords.y - node.coords.y, 2)
+      );
+      const currNodeDistance = Math.sqrt(
+        Math.pow(currNode.coords.x - node.coords.x, 2) +
+          Math.pow(currNode.coords.y - node.coords.y, 2)
+      );
+      return prevNodeDistance < currNodeDistance ? prevNode : currNode;
+    });
+    return closestNode.id;
   }
 
   function updateNode(nodeData: NodeData) {
@@ -54,7 +90,42 @@ export default function GridSystem() {
       const nodeIndex = prevNodes.findIndex((node) => node.id === nodeData.id);
       const newNodes = [...prevNodes];
       newNodes[nodeIndex] = nodeData;
+
+      updateClosestNeighbors();
       return newNodes;
+    });
+  }
+
+  function updateClosestNeighbors() {
+    setNodes((prevNodes) => {
+      const newNodes = [...prevNodes];
+      newNodes.forEach((node) => {
+        node.closestNeighborID = getClosesNeighborID(node.id, prevNodes);
+      });
+      return newNodes;
+    });
+
+    drawLines();
+  }
+
+  function drawLines() {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    nodes.forEach((node) => {
+      if (!node.closestNeighborID) return;
+      const closestNeighbor = nodes.find(
+        (neighbor) => neighbor.id === node.closestNeighborID
+      );
+      if (!closestNeighbor) return;
+      console.log(node.coords, closestNeighbor.coords);
+      ctx.beginPath();
+      ctx.moveTo(node.coords.x, node.coords.y);
+      ctx.lineTo(closestNeighbor.coords.x, closestNeighbor.coords.y);
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 2;
+      ctx.stroke();
     });
   }
 
@@ -64,6 +135,7 @@ export default function GridSystem() {
       {nodes.map((node) => (
         <GridNode nodeData={node} updateNodeData={updateNode} key={node.id} />
       ))}
+      <canvas className="absolute w-full h-full z-0" ref={canvasRef}></canvas>
     </div>
   );
 }
@@ -128,7 +200,7 @@ function GridNode({
     <div
       ref={targetDiv}
       className={clsx(
-        "aspect-square rounded-full absolute cursor-grab",
+        "aspect-square rounded-full absolute cursor-grab flex items-center justify-center z-10",
         nodeData.color,
         isDragging && "cursor-grabbing"
       )}
@@ -138,6 +210,8 @@ function GridNode({
         top: nodeData.coords.y - nodeData.size / 2,
       }}
       onMouseDown={startDrag}
-    ></div>
+    >
+      {nodeData.content}
+    </div>
   );
 }
