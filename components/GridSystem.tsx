@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Coords = {
   x: number;
@@ -22,11 +22,22 @@ export default function GridSystem() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
+  const resizeCanvas = useCallback((nodes: NodeData[]) => {
     if (!canvasRef.current) return;
     canvasRef.current.height = window.innerHeight;
     canvasRef.current.width = window.innerWidth;
+    drawLines(canvasRef.current, nodes);
   }, []);
+
+  useEffect(() => {
+    resizeCanvas(nodes);
+
+    window.addEventListener("resize", () => resizeCanvas(nodes));
+
+    return () => {
+      window.removeEventListener("resize", () => resizeCanvas(nodes));
+    };
+  }, [nodes, resizeCanvas]);
 
   function getCursorCoords(
     e: React.MouseEvent<HTMLDivElement, MouseEvent>
@@ -76,7 +87,6 @@ export default function GridSystem() {
     const node = nodes.find((node) => node.id === id);
     if (!node) return;
     const closestNode = nodes.reduce((prevNode, currNode) => {
-      console.log(prevNode, currNode);
       if (currNode.id === id) return prevNode;
       if (prevNode.id === id) return currNode;
       const prevNodeDistance = Math.sqrt(
@@ -86,9 +96,6 @@ export default function GridSystem() {
       const currNodeDistance = Math.sqrt(
         Math.pow(currNode.coords.x - node.coords.x, 2) +
           Math.pow(currNode.coords.y - node.coords.y, 2)
-      );
-      console.log(
-        prevNodeDistance < currNodeDistance ? prevNode.id : currNode.id
       );
       return prevNodeDistance < currNodeDistance ? prevNode : currNode;
     });
